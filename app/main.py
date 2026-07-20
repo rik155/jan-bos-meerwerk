@@ -59,8 +59,8 @@ async def submit(data_json: str = Form(...), fotos: list[UploadFile] = File(defa
             foto_paden_json=json.dumps([str(p) for p in photo_paths]), excel_pad=str(excel_path),
         )
         db.add(record); db.commit(); db.refresh(record)
-        send_email(excel_path, data, photo_paths)
-        return {"ok": True, "id": record.id, "bestandsnaam": excel_path.name}
+        message_id = send_email(excel_path, data, photo_paths)
+        return {"ok": True, "id": record.id, "bestandsnaam": excel_path.name, "message_id": message_id}
     except HTTPException:
         raise
     except Exception as exc:

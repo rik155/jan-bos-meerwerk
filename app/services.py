@@ -135,11 +135,17 @@ def create_excel(data: MeerwerkInput, photo_paths: list[Path]) -> Path:
     return path
 
 
-def send_email(path: Path, data: MeerwerkInput, photo_paths: Iterable[Path]) -> None:
+def send_email(path: Path, data: MeerwerkInput, photo_paths: Iterable[Path]) -> str:
     if not settings.brevo_api_key:
-        return
+        raise RuntimeError('BREVO_API_KEY ontbreekt of is leeg in Render')
+    if not settings.mail_to:
+        raise RuntimeError('Ontvanger ontbreekt: stel DEFAULT_EXPORT_EMAIL of MAIL_TO in')
+    if not settings.mail_from:
+        raise RuntimeError('Afzender ontbreekt: stel SMTP_USERNAME of MAIL_FROM in')
+
+    photos = list(photo_paths)
     attachments = [{"content": base64.b64encode(path.read_bytes()).decode("ascii"), "name": path.name}]
-    for photo in photo_paths:
+    for photo in photos:
         attachments.append({"content": base64.b64encode(photo.read_bytes()).decode("ascii"), "name": photo.name})
     payload = {
         "sender": {"name": settings.mail_from_name, "email": settings.mail_from},
@@ -149,9 +155,21 @@ def send_email(path: Path, data: MeerwerkInput, photo_paths: Iterable[Path]) -> 
             f"<p>Nieuw meerwerkrapport van <b>{data.medewerker}</b>.</p>"
             f"<p><b>Opdrachtgever:</b> {data.opdrachtgever}<br>"
             f"<b>Object:</b> {data.object}<br><b>Datum:</b> {data.datum}<br>"
-            f"<b>Uren:</b> {data.uren:g}<br><b>Aantal foto's:</b> {len(list(photo_paths))}</p>"
+            f"<b>Uren:</b> {data.uren:g}<br><b>Aantal foto's:</b> {len(photos)}</p>"
         ),
         "attachment": attachments,
     }
-    response = requests.post("https://api.brevo.com/v3/smtp/email", headers={"api-key": settings.brevo_api_key, "content-type": "application/json"}, json=payload, timeout=45)
-    response.raise_for_status()
+    print(f'Brevo: meerwerk verzenden van {settings.mail_from} naar {settings.mail_to}', flush=True)
+    response = requests.post(
+        "https://api.brevo.com/v3/smtp/email",
+        headers={"api-key": settings.brevo_api_key, "content-type": "application/json", "accept": "application/json"},
+        json=payload, timeout=60,
+    )
+    if not response.ok:
+        raise RuntimeError(f'Brevo fout {response.status_code}: {response.text[:500]}')
+    result = response.json() if response.content else {}
+    message_id = result.get('messageId', '')
+    if not message_id:
+        raise RuntimeError(f'Brevo gaf geen messageId terug: {response.text[:500]}')
+    print(f'Brevo bevestigd. messageId={message_id}', flush=True)
+    return message_id
