@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#218c42">
+  <title>Jan Bos Meerwerk</title>
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="stylesheet" href="/static/app.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <img src="/static/images/jan-bos-logo.png" alt="Jan Bos" onerror="this.style.display='none'">
+    <div><strong>Meerwerk</strong><span>Digitaal rapport</span></div>
+  </div>
+</header>
+<main class="shell">
+  <form id="form" class="card">
+    <section>
+      <h1>Nieuw meerwerkrapport</h1>
+      <p class="intro">Leg extra werkzaamheden, uren, materialen en foto's direct vast.</p>
+      <div class="grid two">
+        <label>Opdrachtgever<input name="opdrachtgever" required autocomplete="organization"></label>
+        <label>Opdrachtnummer<input name="opdrachtnummer"></label>
+        <label class="wide">Object / werkadres<input name="object" required autocomplete="street-address"></label>
+        <label>Datum<input name="datum" type="date" required></label>
+        <label>Medewerker<input name="medewerker" required autocomplete="name"></label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Meerwerk</h2>
+      <label>Omschrijving van het meerwerk<textarea name="omschrijving" rows="5" required placeholder="Beschrijf duidelijk wat extra is uitgevoerd..."></textarea></label>
+      <label>Reden / oorzaak<textarea name="reden" rows="3" placeholder="Waarom was dit meerwerk nodig?"></textarea></label>
+      <div class="grid two">
+        <label>Aantal extra uren<input name="uren" type="number" min="0" step="0.25" value="0"></label>
+        <label>Kostenindicatie (optioneel)<input name="kostenindicatie" placeholder="Bijv. € 350 excl. btw"></label>
+      </div>
+      <label>Gebruikte materialen<textarea name="materialen" rows="4" placeholder="Materiaal en aantallen..."></textarea></label>
+    </section>
+
+    <section>
+      <h2>Foto's</h2>
+      <p class="hint">Voeg maximaal 12 foto's toe. Op telefoon kun je direct de camera gebruiken.</p>
+      <label class="upload">
+        <span>📷 Foto's toevoegen</span>
+        <input id="fotos" name="fotos" type="file" accept="image/*" multiple>
+      </label>
+      <div id="preview" class="preview"></div>
+    </section>
+
+    <section>
+      <h2>Handtekening klant / opdrachtgever</h2>
+      <p class="hint">Laat de klant met een vinger tekenen.</p>
+      <canvas id="signature" width="900" height="260" aria-label="Handtekening"></canvas>
+      <button type="button" id="clear" class="secondary">Handtekening wissen</button>
+    </section>
+
+    <div id="message" class="message" hidden></div>
+    <button id="submit" type="submit" class="primary">Meerwerk verzenden</button>
+  </form>
+</main>
+<script src="/static/app.js?v=1"></script>
+</body>
+</html>
