@@ -2,9 +2,11 @@ import base64
 import io
 import re
 from datetime import datetime
+from email.message import EmailMessage
+import mimetypes
+import smtplib
 from pathlib import Path
 from typing import Iterable
-import requests
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -135,41 +137,60 @@ def create_excel(data: MeerwerkInput, photo_paths: list[Path]) -> Path:
     return path
 
 
-def send_email(path: Path, data: MeerwerkInput, photo_paths: Iterable[Path]) -> str:
-    if not settings.brevo_api_key:
-        raise RuntimeError('BREVO_API_KEY ontbreekt of is leeg in Render')
-    if not settings.mail_to:
-        raise RuntimeError('Ontvanger ontbreekt: stel DEFAULT_EXPORT_EMAIL of MAIL_TO in')
-    if not settings.mail_from:
-        raise RuntimeError('Afzender ontbreekt: stel SMTP_USERNAME of MAIL_FROM in')
+def send_email(path: Path, data: MeerwerkInput, photo_paths: Iterable[Path]) -> bool:
+    """Verstuur het Excel-rapport en de foto's via dezelfde SMTP-methode als de Glaszetter-app."""
+    if not settings.smtp_host:
+        raise RuntimeError("SMTP_HOST ontbreekt in Render Environment")
+    if not settings.smtp_from:
+        raise RuntimeError("SMTP_FROM ontbreekt in Render Environment")
+
+    recipient = settings.default_export_email.strip()
+    if not recipient:
+        raise RuntimeError("DEFAULT_EXPORT_EMAIL ontbreekt in Render Environment")
 
     photos = list(photo_paths)
-    attachments = [{"content": base64.b64encode(path.read_bytes()).decode("ascii"), "name": path.name}]
-    for photo in photos:
-        attachments.append({"content": base64.b64encode(photo.read_bytes()).decode("ascii"), "name": photo.name})
-    payload = {
-        "sender": {"name": settings.mail_from_name, "email": settings.mail_from},
-        "to": [{"email": settings.mail_to}],
-        "subject": f"Meerwerk - {data.opdrachtgever} - {data.object}",
-        "htmlContent": (
-            f"<p>Nieuw meerwerkrapport van <b>{data.medewerker}</b>.</p>"
-            f"<p><b>Opdrachtgever:</b> {data.opdrachtgever}<br>"
-            f"<b>Object:</b> {data.object}<br><b>Datum:</b> {data.datum}<br>"
-            f"<b>Uren:</b> {data.uren:g}<br><b>Aantal foto's:</b> {len(photos)}</p>"
-        ),
-        "attachment": attachments,
-    }
-    print(f'Brevo: meerwerk verzenden van {settings.mail_from} naar {settings.mail_to}', flush=True)
-    response = requests.post(
-        "https://api.brevo.com/v3/smtp/email",
-        headers={"api-key": settings.brevo_api_key, "content-type": "application/json", "accept": "application/json"},
-        json=payload, timeout=60,
+    msg = EmailMessage()
+    msg["Subject"] = f"Meerwerk - {data.opdrachtgever} - {data.object}"
+    msg["From"] = settings.smtp_from
+    msg["To"] = recipient
+    msg.set_content(
+        "Nieuw meerwerkrapport.\n\n"
+        f"Medewerker: {data.medewerker}\n"
+        f"Opdrachtgever: {data.opdrachtgever}\n"
+        f"Object / werkadres: {data.object}\n"
+        f"Datum: {data.datum}\n"
+        f"Extra uren: {data.uren:g}\n"
+        f"Aantal foto's: {len(photos)}\n\n"
+        "Het Excel-rapport en de foto's zijn bijgevoegd."
     )
-    if not response.ok:
-        raise RuntimeError(f'Brevo fout {response.status_code}: {response.text[:500]}')
-    result = response.json() if response.content else {}
-    message_id = result.get('messageId', '')
-    if not message_id:
-        raise RuntimeError(f'Brevo gaf geen messageId terug: {response.text[:500]}')
-    print(f'Brevo bevestigd. messageId={message_id}', flush=True)
-    return message_id
+
+    msg.add_attachment(
+        path.read_bytes(),
+        maintype="application",
+        subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=path.name,
+    )
+
+    for index, photo in enumerate(photos, 1):
+        mime, _ = mimetypes.guess_type(photo.name)
+        maintype, subtype = (mime or "image/jpeg").split("/", 1)
+        msg.add_attachment(
+            photo.read_bytes(),
+            maintype=maintype,
+            subtype=subtype,
+            filename=f"foto_{index}.jpg",
+        )
+
+    print(
+        f"SMTP verzenden: van={settings.smtp_from} naar={recipient} "
+        f"host={settings.smtp_host}:{settings.smtp_port} bijlagen={1 + len(photos)}",
+        flush=True,
+    )
+    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=45) as smtp:
+        if settings.smtp_use_tls:
+            smtp.starttls()
+        if settings.smtp_username:
+            smtp.login(settings.smtp_username, settings.smtp_password)
+        smtp.send_message(msg)
+    print("SMTP bevestigd: bericht geaccepteerd door mailserver", flush=True)
+    return True
