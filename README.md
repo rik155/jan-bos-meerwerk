@@ -21,7 +21,6 @@ Gebruik exact dezelfde SMTP-instellingen als bij de werkende Glaszetter-app:
 - `SMTP_PORT`
 - `SMTP_USERNAME`
 - `SMTP_PASSWORD`
-- `SMTP_FROM`
 - `SMTP_USE_TLS`
 
 `BREVO_API_KEY`, `MAIL_FROM` en `MAIL_TO` zijn voor deze versie niet nodig.

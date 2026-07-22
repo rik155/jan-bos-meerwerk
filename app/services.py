@@ -141,9 +141,6 @@ def send_email(path: Path, data: MeerwerkInput, photo_paths: Iterable[Path]) -> 
     """Verstuur het Excel-rapport en de foto's via dezelfde SMTP-methode als de Glaszetter-app."""
     if not settings.smtp_host:
         raise RuntimeError("SMTP_HOST ontbreekt in Render Environment")
-    if not settings.smtp_from:
-        raise RuntimeError("SMTP_FROM ontbreekt in Render Environment")
-
     recipient = settings.default_export_email.strip()
     if not recipient:
         raise RuntimeError("DEFAULT_EXPORT_EMAIL ontbreekt in Render Environment")
@@ -151,7 +148,11 @@ def send_email(path: Path, data: MeerwerkInput, photo_paths: Iterable[Path]) -> 
     photos = list(photo_paths)
     msg = EmailMessage()
     msg["Subject"] = f"Meerwerk - {data.opdrachtgever} - {data.object}"
-    msg["From"] = settings.smtp_from
+    sender = settings.smtp_username.strip()
+    if not sender:
+        raise RuntimeError("SMTP_USERNAME ontbreekt in Render Environment")
+
+    msg["From"] = sender
     msg["To"] = recipient
     msg.set_content(
         "Nieuw meerwerkrapport.\n\n"
@@ -182,7 +183,7 @@ def send_email(path: Path, data: MeerwerkInput, photo_paths: Iterable[Path]) -> 
         )
 
     print(
-        f"SMTP verzenden: van={settings.smtp_from} naar={recipient} "
+        f"SMTP verzenden: van={sender} naar={recipient} "
         f"host={settings.smtp_host}:{settings.smtp_port} bijlagen={1 + len(photos)}",
         flush=True,
     )
